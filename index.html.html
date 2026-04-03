@@ -3,575 +3,245 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTT DHL AI Smart Logistics v30.0 (Dashboard Plus)</title>
+    <title>TTT DHL AI Smart Logistics v30.0 (Modern Edition)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: 'Sarabun', sans-serif; background-color: #f8fafc; }
-        .dhl-yellow { background-color: #FFCC00; }
-        .dhl-red { background-color: #D40511; }
-        .dhl-text-red { color: #D40511; }
-        .card { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.03); border: 1px solid #edf2f7; }
-        .table-container { max-height: 500px; overflow-y: auto; border-radius: 12px; }
-        table thead { position: sticky; top: 0; background: #FFCC00; z-index: 10; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #D40511; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .tab-active { background-color: #D40511; color: white; box-shadow: 0 4px 12px rgba(212, 5, 17, 0.2); }
-        .drop-zone { border: 2px dashed #cbd5e0; transition: all 0.3s; border-radius: 20px; }
-        .drop-zone.active { border-color: #D40511; background: #fff5f5; }
-        .chart-container { height: 280px; position: relative; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
     </style>
-<script>
-(function() {
-  const BASE = "https://thongthai.connextai.app/api/v1/proxy/canvas/bd0d17ed-8a09-4e88-b859-ac30ca19e640";
-  const REFRESH_URL = "https://thongthai.connextai.app/api/v1/proxy/auth/refresh";
-
-  let _refreshPromise = null;
-
-  async function _doRefresh() {
-    if (_refreshPromise) return _refreshPromise;
-    _refreshPromise = fetch(REFRESH_URL, {
-      method: "POST",
-      credentials: "include",
-    }).then(r => {
-      if (!r.ok) throw new Error("Token refresh failed: " + r.status);
-    }).finally(() => {
-      _refreshPromise = null;
-    });
-    return _refreshPromise;
-  }
-
-  async function _fetchWithRetry(url, options) {
-    const res = await fetch(url, options);
-    if (res.status === 401) {
-      await _doRefresh();
-      return fetch(url, options);
-    }
-    return res;
-  }
-
-  async function request(path, options = {}) {
-    const res = await _fetchWithRetry(BASE + path, {
-      ...options,
-      credentials: "include",
-      headers: { "Content-Type": "application/json", ...options.headers },
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error("Canvas API error " + res.status + ": " + body);
-    }
-    if (res.status === 204) return null;
-    return res.json();
-  }
-
-  window.CanvasDB = {
-    create(collection, data, docId) {
-      const body = { data };
-      if (docId) body.doc_id = docId;
-      return request("/collections/" + encodeURIComponent(collection) + "/documents", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-    },
-    get(collection, docId) {
-      return request("/collections/" + encodeURIComponent(collection) + "/documents/" + encodeURIComponent(docId));
-    },
-    list(collection, { filter, sort, limit, offset } = {}) {
-      const params = new URLSearchParams();
-      if (filter) (Array.isArray(filter) ? filter : [filter]).forEach(f => params.append("filter", f));
-      if (sort) params.set("sort", sort);
-      if (limit != null) params.set("limit", String(limit));
-      if (offset != null) params.set("offset", String(offset));
-      const qs = params.toString();
-      return request("/collections/" + encodeURIComponent(collection) + "/documents" + (qs ? "?" + qs : ""));
-    },
-    update(collection, docId, data) {
-      return request("/collections/" + encodeURIComponent(collection) + "/documents/" + encodeURIComponent(docId), {
-        method: "PUT",
-        body: JSON.stringify({ data }),
-      });
-    },
-    merge(collection, docId, partialData) {
-      return request("/collections/" + encodeURIComponent(collection) + "/documents/" + encodeURIComponent(docId), {
-        method: "PATCH",
-        body: JSON.stringify({ data: partialData }),
-      });
-    },
-    remove(collection, docId) {
-      return request("/collections/" + encodeURIComponent(collection) + "/documents/" + encodeURIComponent(docId), {
-        method: "DELETE",
-      });
-    },
-  };
-
-  window.CanvasStorage = {
-    upload(storage, file) {
-      const form = new FormData();
-      form.append("file", file);
-      return _fetchWithRetry(BASE + "/storages/" + encodeURIComponent(storage) + "/files", {
-        method: "POST",
-        credentials: "include",
-        body: form,
-      }).then(r => { if (!r.ok) throw new Error("Upload failed: " + r.status); return r.json(); });
-    },
-    download(storage, fileId) {
-      return _fetchWithRetry(BASE + "/storages/" + encodeURIComponent(storage) + "/files/" + encodeURIComponent(fileId), {
-        credentials: "include",
-      }).then(r => { if (!r.ok) throw new Error("Download failed: " + r.status); return r.blob(); });
-    },
-    list(storage) {
-      return request("/storages/" + encodeURIComponent(storage) + "/files");
-    },
-    remove(storage, fileId) {
-      return request("/storages/" + encodeURIComponent(storage) + "/files/" + encodeURIComponent(fileId), {
-        method: "DELETE",
-      });
-    },
-    getFileUrl(storage, fileId) {
-      return BASE + "/storages/" + encodeURIComponent(storage) + "/files/" + encodeURIComponent(fileId);
-    },
-  };
-
-  window.CanvasUser = {
-    me() {
-      return request("/me");
-    },
-  };
-
-  window.CanvasAuth = {
-    refresh() {
-      return _doRefresh();
-    },
-  };
-})();
-</script>
 </head>
-<body class="p-4 md:p-8">
+<body class="bg-[#f8fafc] text-[#1e293b] p-4 md:p-8">
 
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-6">
-            <div>
-                <h1 class="text-4xl font-black tracking-tight flex items-center gap-3">
-                    <span class="bg-[#D40511] text-white px-3 py-1 rounded-lg">TTT</span> 
-                    <span class="text-gray-800">DHL Logistics</span>
-                </h1>
-                <p class="text-gray-500 mt-2 font-medium">v30.0 Intelligent Dashboard & Analytics</p>
+    <div class="max-w-7xl mx-auto space-y-8">
+        <!-- Header & Tab Switcher -->
+        <div class="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg">T</div>
+                <div>
+                    <h1 class="text-xl font-extrabold text-slate-800">TTT DHL Smart Logistics</h1>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">v30.9 External Sync</p>
+                </div>
             </div>
             
-            <div class="flex items-center gap-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100">
-                <button onclick="switchTab('dashboard')" id="tabBtn-dashboard" class="px-6 py-2.5 rounded-xl transition-all font-bold tab-active">Dashboard</button>
-                <button onclick="switchTab('extractor')" id="tabBtn-extractor" class="px-6 py-2.5 rounded-xl transition-all font-bold text-gray-500 hover:bg-gray-50">AI Extractor</button>
+            <div class="flex bg-slate-100 p-1.5 rounded-2xl">
+                <button onclick="switchTab('dashboard')" id="tab-dashboard" class="px-8 py-2.5 rounded-xl text-sm font-extrabold transition-all bg-white text-blue-600 shadow-sm">Dashboard</button>
+                <button onclick="switchTab('extractor')" id="tab-extractor" class="px-8 py-2.5 rounded-xl text-sm font-extrabold transition-all text-slate-500 hover:text-slate-800">AI Extractor</button>
             </div>
 
-            <button onclick="loadData()" class="px-6 py-3 dhl-yellow text-black rounded-xl font-bold flex items-center gap-2 hover:brightness-95 shadow-lg shadow-yellow-200/50 transition-all active:scale-95">
-                🔄 ซิงค์ข้อมูลล่าสุด
-            </button>
+            <div id="last-update" class="px-4 py-2 bg-slate-50 text-slate-500 rounded-xl text-xs font-bold border border-slate-100">Syncing...</div>
         </div>
 
-        <!-- DASHBOARD VIEW -->
-        <div id="view-dashboard" class="space-y-8">
+        <!-- Dashboard Content -->
+        <div id="content-dashboard" class="space-y-8">
             <!-- Stats Grid -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="card p-6 bg-gradient-to-br from-white to-gray-50">
-                    <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">Total Shipments</p>
-                    <h2 id="statTotal" class="text-4xl font-black mt-2 text-gray-800">0</h2>
+                <div class="bg-white p-6 rounded-[2rem] border-l-4 border-l-blue-600 shadow-sm">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Shipments</p>
+                    <h3 id="stat-count" class="text-3xl font-extrabold text-slate-900">-</h3>
                 </div>
-                <div class="card p-6 border-b-4 border-[#FFCC00]">
-                    <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">Weight (KG)</p>
-                    <h2 id="statWeight" class="text-4xl font-black mt-2 text-gray-800">0</h2>
+                <div class="bg-white p-6 rounded-[2rem] border-l-4 border-l-indigo-600 shadow-sm">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Weight (kg)</p>
+                    <h3 id="stat-weight" class="text-3xl font-extrabold text-slate-900">-</h3>
                 </div>
-                <div class="card p-6 border-b-4 border-[#D40511]">
-                    <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">Total Cost (THB)</p>
-                    <h2 id="statCost" class="text-4xl font-black mt-2 text-[#D40511]">0</h2>
+                <div class="bg-white p-6 rounded-[2rem] border-l-4 border-l-emerald-600 shadow-sm">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Charges</p>
+                    <h3 id="stat-charge" class="text-3xl font-extrabold text-slate-900">-</h3>
                 </div>
-                <div class="card p-6 border-b-4 border-blue-600">
-                    <p class="text-gray-400 text-xs font-bold uppercase tracking-widest">Top Active Brand</p>
-                    <h2 id="statTopBrand" class="text-4xl font-black mt-2 text-blue-700">-</h2>
-                </div>
-            </div>
-
-            <!-- Charts Grid -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div class="card p-6">
-                    <h3 class="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span class="w-2 h-6 bg-yellow-400 rounded-full"></span> 
-                        Cost Analysis by Brand
-                    </h3>
-                    <div class="chart-container">
-                        <canvas id="brandChart"></canvas>
-                    </div>
-                </div>
-                <div class="card p-6">
-                    <h3 class="font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span class="w-2 h-6 bg-red-500 rounded-full"></span> 
-                        Monthly Shipment Trend
-                    </h3>
-                    <div class="chart-container">
-                        <canvas id="trendChart"></canvas>
-                    </div>
+                <div class="bg-white p-6 rounded-[2rem] border-l-4 border-l-orange-600 shadow-sm">
+                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Top Brand</p>
+                    <h3 id="stat-brand" class="text-2xl font-extrabold text-slate-900 truncate">-</h3>
                 </div>
             </div>
 
-            <!-- Table Section -->
-            <div class="card overflow-hidden">
-                <div class="p-5 border-b bg-gray-50 flex flex-col md:row justify-between gap-4">
-                    <div class="flex flex-wrap gap-3 items-center">
-                        <div class="relative flex-1 min-w-[300px]">
-                            <span class="absolute left-4 top-3 text-gray-400">🔍</span>
-                            <input type="text" id="searchInput" oninput="filterData()" placeholder="ค้นหา Waybill, Ship To, Brand..." 
-                                class="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-yellow-400 transition-all">
-                        </div>
-                        <select id="brandFilter" onchange="filterData()" class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-yellow-400">
-                            <option value="">ทุกแบรนด์</option>
-                        </select>
-                        <select id="yearFilter" onchange="filterData()" class="px-4 py-2.5 bg-white border border-gray-200 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-yellow-400">
-                            <option value="">ทุกปี</option>
-                        </select>
-                    </div>
-                    <button onclick="exportToExcel()" class="px-6 py-2.5 bg-emerald-600 text-white rounded-xl font-bold flex items-center gap-2 hover:bg-emerald-700 shadow-md transition-all active:scale-95">
-                        📥 Export Data
-                    </button>
+            <!-- Charts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div class="lg:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-[450px]">
+                    <h4 class="text-lg font-extrabold mb-6 flex items-center gap-2"><span class="w-1.5 h-5 bg-blue-600 rounded-full"></span> Monthly Trend</h4>
+                    <div class="h-80"><canvas id="trendChart"></canvas></div>
                 </div>
-                <div class="table-container">
-                    <table class="w-full text-left">
-                        <thead>
-                            <tr class="text-[11px] font-black uppercase tracking-wider text-black">
-                                <th class="p-5">Brand</th>
-                                <th class="p-5">Waybill No.</th>
-                                <th class="p-5">Date</th>
-                                <th class="p-5">Year</th>
-                                <th class="p-5">Ship To</th>
-                                <th class="p-5 text-right">Weight</th>
-                                <th class="p-5 text-right">Charge</th>
-                                <th class="p-5">Remarks</th>
+                <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm h-[450px]">
+                    <h4 class="text-lg font-extrabold mb-6 flex items-center gap-2"><span class="w-1.5 h-5 bg-indigo-600 rounded-full"></span> Cost by Brand</h4>
+                    <div class="h-80"><canvas id="brandChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+                <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
+                    <h4 class="text-lg font-extrabold text-slate-800">Shipment Logs</h4>
+                    <input type="text" id="tableSearch" placeholder="Search..." class="px-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64">
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest">
+                            <tr>
+                                <th class="px-8 py-4">Waybill</th>
+                                <th class="px-8 py-4">Date</th>
+                                <th class="px-8 py-4">Year</th>
+                                <th class="px-8 py-4">Brand</th>
+                                <th class="px-8 py-4">Ship To</th>
+                                <th class="px-8 py-4 text-right">Weight</th>
+                                <th class="px-8 py-4 text-right">Charge</th>
+                                <th class="px-8 py-4">Remarks</th>
                             </tr>
                         </thead>
-                        <tbody id="tableBody" class="text-sm"></tbody>
+                        <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
                     </table>
                 </div>
             </div>
         </div>
 
-        <!-- AI EXTRACTOR VIEW -->
-        <div id="view-extractor" class="hidden animate-fadeIn">
-            <div class="max-w-4xl mx-auto py-10">
-                <div id="dropZone" class="card p-16 drop-zone text-center bg-white border-2 border-dashed">
-                    <div class="bg-red-50 w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                        <span class="text-5xl">📄</span>
-                    </div>
-                    <h2 class="text-3xl font-black mb-3">AI PDF Extractor</h2>
-                    <p class="text-gray-500 mb-10 max-w-md mx-auto">ลากไฟล์ DHL Receipt มาวางเพื่อแกะข้อมูลลง Google Sheets โดยอัตโนมัติ</p>
-                    
-                    <input type="file" id="pdfFileInput" accept="application/pdf" class="hidden" onchange="handleFileUpload(event)">
-                    <button onclick="document.getElementById('pdfFileInput').click()" 
-                            class="px-12 py-5 dhl-red text-white rounded-2xl font-black text-xl hover:shadow-2xl hover:shadow-red-200 transition-all active:scale-95 flex items-center gap-4 mx-auto">
-                        <span>เลือกไฟล์ PDF</span>
-                        <span class="text-2xl">→</span>
-                    </button>
-
-                    <div id="processingLoader" class="hidden mt-10 flex flex-col items-center">
-                        <div class="loader mb-4"></div>
-                        <p class="text-lg font-bold text-red-600 animate-pulse">AI กำลังวิเคราะห์โครงสร้างไฟล์...</p>
-                    </div>
-
-                    <div id="extractionContainer" class="mt-12 text-left hidden">
-                        <div class="flex justify-between items-end mb-4">
-                            <div>
-                                <h3 class="text-sm font-black text-gray-800 uppercase tracking-widest">Extracted Results</h3>
-                                <p class="text-xs text-gray-400 mt-1">Copy & Paste สำหรับคอลัมน์ Waybill เป็นต้นไป</p>
-                            </div>
-                            <button id="copyBtn" onclick="copyExtractedData()" 
-                                class="bg-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-black hover:bg-blue-700 shadow-lg shadow-blue-100 transition-all active:scale-95">
-                                📋 Copy Data Row
-                            </button>
-                        </div>
-                        
-                        <textarea id="aiOutput" rows="3" readonly 
-                            class="w-full p-5 bg-gray-900 text-green-400 border-none rounded-2xl font-mono text-sm shadow-2xl mb-6"></textarea>
-                        
-                        <div class="p-6 bg-yellow-50 border-l-8 border-yellow-400 rounded-2xl">
-                            <p class="text-xs text-yellow-800 font-black mb-4 flex items-center gap-2">
-                                📌 พรีวิวข้อมูล (7 คอลัมน์ที่แกะได้):
-                            </p>
-                            <div id="dataPreview" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4"></div>
-                        </div>
-                    </div>
+        <!-- Extractor Content -->
+        <div id="content-extractor" class="hidden max-w-4xl mx-auto space-y-8">
+            <div class="bg-white p-10 rounded-[3rem] border-2 border-dashed border-slate-200 text-center cursor-pointer hover:border-blue-400 transition-all" onclick="document.getElementById('pdfUpload').click()">
+                <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                 </div>
+                <h3 class="text-2xl font-extrabold text-slate-800">Upload DHL Receipt</h3>
+                <p class="text-slate-400 mt-2 font-medium">Click to select PDF file for AI Extraction</p>
+                <input type="file" id="pdfUpload" accept=".pdf" class="hidden">
             </div>
-        </div>
-    </div>
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 bg-white/90 z-50 flex items-center justify-center hidden">
-        <div class="flex flex-col items-center">
-            <div class="loader mb-4"></div>
-            <p class="font-black text-gray-800 tracking-widest uppercase">Syncing Cloud Data</p>
+            <div id="extractorResult" class="hidden bg-white p-8 rounded-[3rem] border border-slate-200 shadow-xl relative min-h-[400px]">
+                <div id="loader" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-[3rem]">
+                    <div class="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <p class="text-blue-600 font-bold animate-pulse">AI Processing...</p>
+                </div>
+                <div class="flex items-center justify-between mb-8 pb-4 border-b">
+                    <h3 class="text-xl font-extrabold text-slate-800">Extraction Result</h3>
+                    <button id="copyBtn" class="bg-slate-900 text-white px-6 py-2 rounded-xl text-xs font-extrabold hover:bg-blue-600 transition-all">Copy Data Row</button>
+                </div>
+                <div id="previewGrid" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+            </div>
         </div>
     </div>
 
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        const SPREADSHEET_ID = '1D47UMO-kNrbTUzJP55Qtk7zS5hzYQZCTcTL_7s73LUM';
-        let allData = [], filteredData = [], brandChart = null, trendChart = null;
-        const $ = (id) => document.getElementById(id);
-        const formatNum = (n, d=0) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n || 0);
 
-        function switchTab(t) {
-            $('view-dashboard').classList.toggle('hidden', t !== 'dashboard');
-            $('view-extractor').classList.toggle('hidden', t !== 'extractor');
-            $('tabBtn-dashboard').classList.toggle('tab-active', t === 'dashboard');
-            $('tabBtn-dashboard').classList.toggle('text-gray-500', t !== 'dashboard');
-            $('tabBtn-extractor').classList.toggle('tab-active', t === 'extractor');
-            $('tabBtn-extractor').classList.toggle('text-gray-500', t !== 'extractor');
+        const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQF-SGcbUWAE8a4YpJRMQGWCP4MrpHpfCa8nfc6rNn9ZNI_7dEMIAKUXXLGycYwZw35uZ_j1qqn4_oP/pub?output=csv";
+        let trendChart, brandChart;
+
+        function switchTab(tab) {
+            document.getElementById('content-dashboard').classList.toggle('hidden', tab !== 'dashboard');
+            document.getElementById('content-extractor').classList.toggle('hidden', tab !== 'extractor');
+            document.getElementById('tab-dashboard').className = tab === 'dashboard' ? "px-8 py-2.5 rounded-xl text-sm font-extrabold transition-all bg-white text-blue-600 shadow-sm" : "px-8 py-2.5 rounded-xl text-sm font-extrabold transition-all text-slate-500 hover:text-slate-800";
+            document.getElementById('tab-extractor').className = tab === 'extractor' ? "px-8 py-2.5 rounded-xl text-sm font-extrabold transition-all bg-white text-blue-600 shadow-sm" : "px-8 py-2.5 rounded-xl text-sm font-extrabold transition-all text-slate-500 hover:text-slate-800";
         }
 
         async function loadData() {
-            $('loadingOverlay').classList.remove('hidden');
             try {
-                const r = await fetch(`/api/v1/proxy/google-sheets/${SPREADSHEET_ID}/values/Sheet1!A1:Z3000`);
-                const d = await r.json();
-                if (d?.values?.length > 0) {
-                    const h = d.values[0].map(v => v.trim());
-                    allData = d.values.slice(1).map(row => {
-                        let o = {}; h.forEach((k, i) => o[k] = row[i] ?? '');
-                        return o;
-                    });
-                    initFilters();
-                    filterData();
-                }
-            } catch(e) { console.error(e); }
-            $('loadingOverlay').classList.add('hidden');
+                const status = document.getElementById('last-update');
+                status.innerText = "🔄 Syncing...";
+                const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(SHEET_CSV_URL + "&cb=" + Date.now());
+                const res = await fetch(proxyUrl);
+                const json = await res.json();
+                const csv = json.contents;
+
+                const rows = csv.split(/\r?\n/).filter(r => r.trim()).map(r => r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim()));
+                renderDashboard(rows.slice(1));
+                status.innerText = "✅ Sync: " + new Date().toLocaleTimeString();
+                status.className = "px-4 py-2 bg-green-50 text-green-600 rounded-xl text-xs font-bold border border-green-100";
+            } catch (err) {
+                console.error(err);
+                document.getElementById('last-update').innerText = "❌ Sync Failed";
+            }
         }
 
-        function initFilters() {
-            const brands = [...new Set(allData.map(d => (d.Brand || '').trim()).filter(Boolean))].sort();
-            const years = [...new Set(allData.map(d => (d.Year || '').trim()).filter(Boolean))].sort().reverse();
-            $('brandFilter').innerHTML = '<option value="">ทุกแบรนด์</option>' + brands.map(b => `<option value="${b}">${b}</option>`).join('');
-            $('yearFilter').innerHTML = '<option value="">ทุกปี</option>' + years.map(y => `<option value="${y}">${y}</option>`).join('');
-        }
+        function renderDashboard(data) {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            let weight = 0, charge = 0, brands = {}, trend = {};
 
-        function filterData() {
-            const q = $('searchInput').value.toLowerCase();
-            const bF = $('brandFilter').value;
-            const yF = $('yearFilter').value;
-            filteredData = allData.filter(d => {
-                const matchQ = Object.values(d).some(v => String(v).toLowerCase().includes(q));
-                const matchB = !bF || (d.Brand || '').includes(bF);
-                const matchY = !yF || (d.Year || '').includes(yF);
-                return matchQ && matchB && matchY;
-            });
-            updateDashboard();
-        }
+            data.forEach(row => {
+                const [wb, date, year, brand, shipTo, wStr, cStr] = row;
+                const w = parseFloat(wStr) || 0;
+                const c = parseFloat(cStr) || 0;
+                const rem = row[9] || "";
 
-        function updateDashboard() {
-            const total = filteredData.length;
-            const weight = filteredData.reduce((s, d) => s + (parseFloat(String(d['Total Weight (KG)']).replace(/,/g,'')) || 0), 0);
-            const cost = filteredData.reduce((s, d) => s + (parseFloat(String(d['Total Charge (THB)']).replace(/,/g,'')) || 0), 0);
-            
-            $('statTotal').textContent = formatNum(total);
-            $('statWeight').textContent = formatNum(weight, 1);
-            $('statCost').textContent = formatNum(cost, 2);
-            
-            const bCounts = {}; filteredData.forEach(d => { const b = d.Brand || 'Unknown'; bCounts[b] = (bCounts[b] || 0) + 1; });
-            const topB = Object.keys(bCounts).sort((a,b) => bCounts[b] - bCounts[a])[0] || '-';
-            $('statTopBrand').textContent = topB;
-
-            $('tableBody').innerHTML = filteredData.slice(0, 100).map(d => {
-                // Determine if we should show Remarks or Status (prefer J: Remarks)
-                const remarksValue = d.Remarks !== undefined && d.Remarks !== null && String(d.Remarks).trim() !== "" 
-                                     ? d.Remarks : "";
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-8 py-4 font-bold text-slate-800">${wb}</td>
+                        <td class="px-8 py-4 text-slate-500">${date}</td>
+                        <td class="px-8 py-4 text-slate-400">${year}</td>
+                        <td class="px-8 py-4"><span class="px-2 py-1 bg-slate-100 rounded text-[11px] font-bold text-slate-600">${brand || '-'}</span></td>
+                        <td class="px-8 py-4 text-slate-600 truncate max-w-[150px]">${shipTo}</td>
+                        <td class="px-8 py-4 text-right font-bold">${w.toFixed(2)}</td>
+                        <td class="px-8 py-4 text-right font-extrabold text-blue-600">฿${c.toLocaleString()}</td>
+                        <td class="px-8 py-4 text-[10px] text-slate-400 font-bold">${rem}</td>
+                    </tr>`;
                 
-                return `
-                    <tr class="hover:bg-gray-50 border-b border-gray-100 transition-colors font-medium">
-                        <td class="p-5 font-black text-gray-800">${d.Brand || '-'}</td>
-                        <td class="p-5 font-mono text-blue-600 font-bold">${d['Waybill Number'] || d['Waybill No.'] || '-'}</td>
-                        <td class="p-5 text-gray-500 text-xs">${d['Shipment Date'] || '-'}</td>
-                        <td class="p-5">${d.Year || '-'}</td>
-                        <td class="p-5 text-xs truncate max-w-[180px] text-gray-600">${d['Ship To'] || '-'}</td>
-                        <td class="p-5 text-right font-bold">${formatNum(parseFloat(String(d['Total Weight (KG)']).replace(/,/g,'')) || 0, 1)}</td>
-                        <td class="p-5 text-right font-black text-[#D40511]">${formatNum(parseFloat(String(d['Total Charge (THB)']).replace(/,/g,'')) || 0, 2)}</td>
-                        <td class="p-5">
-                            <span class="px-3 py-1 rounded-lg ${remarksValue ? 'bg-amber-50 text-amber-600 border-amber-100' : ''} text-[10px] font-black border uppercase">
-                                ${remarksValue || ''}
-                            </span>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+                weight += w; charge += c;
+                if(brand) brands[brand] = (brands[brand] || 0) + c;
+                const m = date.split('-')[1] || 'Other'; trend[m] = (trend[m] || 0) + 1;
+            });
 
-            updateCharts();
+            document.getElementById('stat-count').innerText = data.length;
+            document.getElementById('stat-weight').innerText = weight.toFixed(1);
+            document.getElementById('stat-charge').innerText = "฿" + (charge/1000).toFixed(1) + "k";
+            document.getElementById('stat-brand').innerText = Object.entries(brands).sort((a,b) => b[1]-a[1])[0]?.[0] || "-";
+            initCharts(trend, brands);
         }
 
-        function updateCharts() {
-            const ctxBrand = $('brandChart').getContext('2d');
-            const bData = {}; filteredData.forEach(d => { 
-                const b = d.Brand || 'Unknown'; 
-                bData[b] = (bData[b] || 0) + (parseFloat(String(d['Total Charge (THB)']).replace(/,/g,'')) || 0);
-            });
+        function initCharts(trend, brands) {
+            const c1 = document.getElementById('trendChart').getContext('2d');
+            const c2 = document.getElementById('brandChart').getContext('2d');
+            if(trendChart) trendChart.destroy(); if(brandChart) brandChart.destroy();
             
-            if (brandChart) brandChart.destroy();
-            brandChart = new Chart(ctxBrand, {
+            trendChart = new Chart(c1, {
+                type: 'line',
+                data: { labels: Object.keys(trend), datasets: [{ label: 'Shipments', data: Object.values(trend), borderColor: '#2563eb', tension: 0.4, fill: true, backgroundColor: 'rgba(37,99,235,0.05)' }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+            brandChart = new Chart(c2, {
                 type: 'doughnut',
-                data: {
-                    labels: Object.keys(bData),
-                    datasets: [{
-                        data: Object.values(bData),
-                        backgroundColor: ['#FFCC00', '#D40511', '#1e293b', '#3b82f6', '#10b981'],
-                        borderWidth: 0,
-                        hoverOffset: 10
-                    }]
-                },
-                options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { weight: 'bold', family: 'Sarabun' } } } } }
-            });
-
-            const ctxTrend = $('trendChart').getContext('2d');
-            const tData = {}; filteredData.forEach(d => {
-                const date = d['Shipment Date'] || '';
-                const month = date.split('-')[1] || 'Unknown';
-                tData[month] = (tData[month] || 0) + 1;
-            });
-            const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            
-            if (trendChart) trendChart.destroy();
-            trendChart = new Chart(ctxTrend, {
-                type: 'bar',
-                data: {
-                    labels: months,
-                    datasets: [{
-                        label: 'Shipments',
-                        data: months.map(m => tData[m] || 0),
-                        backgroundColor: '#D40511',
-                        borderRadius: 8
-                    }]
-                },
-                options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+                data: { labels: Object.keys(brands), datasets: [{ data: Object.values(brands), backgroundColor: ['#2563eb','#4f46e5','#6366f1','#818cf8','#a5b4fc'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, cutout: '70%' }
             });
         }
 
-        async function handleFileUpload(e) {
-            const file = e.target.files[0];
-            if (file?.type === 'application/pdf') processPDF(file);
-        }
-
-        async function processPDF(file) {
-            $('processingLoader').classList.remove('hidden');
-            $('extractionContainer').classList.add('hidden');
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-                const pdf = await loadingTask.promise;
-                let fullText = "";
-                for (let i = 1; i <= pdf.numPages; i++) {
+        document.getElementById('pdfUpload').addEventListener('change', async (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            document.getElementById('loader').classList.remove('hidden');
+            const reader = new FileReader();
+            reader.onload = async function() {
+                const pdf = await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
+                let text = "";
+                for(let i=1; i<=pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     const content = await page.getTextContent();
-                    fullText += content.items.map(item => item.str).join(" ") + "\n";
+                    text += content.items.map(it => it.str).join(" ") + "\n";
                 }
-                extractDataV36(fullText);
-            } catch(e) { console.error(e); alert("PDF Read Error: " + e.message); }
-            $('processingLoader').classList.add('hidden');
-        }
+                const lines = text.split('\n').filter(l => l.trim());
+                const waybill = (text.match(/\b(\d{10})\b/) || ["","-"])[1];
+                const weight = (text.match(/([\d\.]+)\s*kg/i) || ["","-"])[1];
+                let charge = "-";
+                const cIdx = lines.findIndex(l => l.toUpperCase().includes("CHARGE BREAKDOWN"));
+                if(cIdx !== -1) { for(let i=cIdx+1; i<cIdx+10; i++) { const m = lines[i].match(/([\d,]+\.\d{2})/); if(m) { charge = m[1].replace(/,/g,''); break; } } }
+                let sDate = "-", year = "-";
+                const dM = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+                if(dM) { const ms = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; sDate = `${parseInt(dM[3])}-${ms[parseInt(dM[2])-1]}-${dM[1]}`; year = dM[1]; }
+                let shipTo = "-";
+                const stIdx = lines.findIndex(l => l.toUpperCase().includes("SHIPMENT TO"));
+                if(stIdx !== -1) { const bl = ["THONG THAI","TEXTILE","CHUTIPHON","MONTRISETSIRI"]; for(let i=stIdx+1; i<stIdx+10; i++) { if(!bl.some(b => lines[i].toUpperCase().includes(b)) && lines[i].length > 3) { shipTo = lines[i]; break; } } }
+                
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('extractorResult').classList.remove('hidden');
+                const grid = document.getElementById('previewGrid');
+                const fields = [["Waybill", waybill], ["Date", sDate], ["Year", year], ["Ship To", shipTo], ["Weight", weight+" kg"], ["Charge", "฿"+parseFloat(charge).toLocaleString()]];
+                grid.innerHTML = fields.map(f => `<div class="p-4 bg-slate-50 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">${f[0]}</p><p class="text-slate-800 font-extrabold text-lg">${f[1]}</p></div>`).join('');
+                document.getElementById('copyBtn').onclick = () => {
+                    navigator.clipboard.writeText(`${waybill}\t${sDate}\t${year}\t-\t${shipTo}\t${weight}\t${charge}\t-\t-\tComplete`);
+                    alert("Copied!");
+                };
+            };
+            reader.readAsArrayBuffer(file);
+        });
 
-        function extractDataV36(text) {
-            // 1. Waybill (LOCKED - CORRECT)
-            const waybillMatch = text.match(/\b(\d{10})\b/);
-            const waybill = waybillMatch ? waybillMatch[1] : "-";
-
-            // 2. Weight (LOCKED - CORRECT)
-            const weightMatch = text.match(/([\d\.]+)\s*kg/i);
-            const weight = weightMatch ? weightMatch[1] : "-";
-
-            // 3. Charge (Charge Breakdown Logic)
-            let charge = "-";
-            const chargeIdx = lines.findIndex(l => l.toUpperCase().includes("CHARGE BREAKDOWN"));
-            if (chargeIdx !== -1) {
-                // ค้นหาบรรทัดที่มีทศนิยม 2 ตำแหน่งใต้ Charge Breakdown
-                for (let i = chargeIdx + 1; i < Math.min(chargeIdx + 10, lines.length); i++) {
-                    const line = lines[i];
-                    const amountMatch = line.match(/([\d,]+\.\d{2})/);
-                    if (amountMatch) {
-                        charge = amountMatch[1].replace(/,/g, '');
-                        break;
-                    }
-                }
-            } else {
-                // Fallback: หากไม่เจอ Charge Breakdown ให้หา THB/USD ทั่วไป
-                const chargeMatch = text.match(/([\d,]+\.\d{2})\s*(?:THB|USD)/i) || text.match(/(?:THB|USD)\s*([\d,]+\.\d{2})/i);
-                charge = chargeMatch ? chargeMatch[1].replace(/,/g, '') : "-";
-            }
-
-            // 4. Status (LOCKED)
-            const status = "Complete";
-
-            // 5. Date & Year (GLOBAL SEARCH YYYY-MM-DD)
-            let sDate = "-";
-            let year = "-";
-            const dateMatch = text.match(/(\d{4})-(\d{2})-(\d{2})/);
-            if (dateMatch) {
-                const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-                sDate = `${parseInt(dateMatch[3])}-${months[parseInt(dateMatch[2]) - 1]}-${dateMatch[1]}`;
-                year = dateMatch[1];
-            }
-
-            // 6. Ship To (SKIP SENDER LOGIC)
-            let shipTo = "Not Found";
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-            const stIdx = lines.findIndex(l => l.toUpperCase().includes("SHIPMENT TO") || l.toUpperCase().includes("SHIP TO"));
-            
-            if (stIdx !== -1) {
-                const blacklist = ["THONG THAI", "CHUTIPHON", "PETCHKASEM", "10160", "BANGKOK", "THAILAND", "MONTRIS"];
-                // ค้นหาในระยะ 10 บรรทัดใต้ Shipment To
-                for (let i = stIdx + 1; i < Math.min(stIdx + 10, lines.length); i++) {
-                    const line = lines[i];
-                    const isSender = blacklist.some(word => line.toUpperCase().includes(word));
-                    const isDate = line.match(/\d{4}-\d{2}-\d{2}/);
-                    const isWaybill = line.includes(waybill);
-                    
-                    if (!isSender && !isDate && !isWaybill && line.length > 3 && !line.toUpperCase().includes("SHIPMENT DETAILS")) {
-                        shipTo = line.split(',')[0].trim();
-                        break;
-                    }
-                }
-            }
-
-            const row = `${waybill}\t${sDate}\t${year}\t${shipTo}\t${weight}\t${charge}\t${status}`;
-            $('aiOutput').value = row;
-            
-            const previewData = [
-                {l: 'Waybill', v: waybill}, 
-                {l: 'Date', v: sDate}, 
-                {l: 'Year', v: year}, 
-                {l: 'Ship To', v: shipTo}, 
-                {l: 'Weight', v: weight}, 
-                {l: 'Charge', v: charge}, 
-                {l: 'Status', v: status}
-            ];
-            $('dataPreview').innerHTML = previewData.map(d => `
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-yellow-200">
-                    <span class="block text-[8px] font-black text-gray-400 uppercase tracking-tighter mb-1">${d.l}</span>
-                    <span class="block text-[10px] font-bold text-gray-800 truncate" title="${d.v}">${d.v}</span>
-                </div>
-            `).join('');
-            $('extractionContainer').classList.remove('hidden');
-        }
-
-        function copyExtractedData() {
-            navigator.clipboard.writeText($('aiOutput').value).then(() => {
-                const b = $('copyBtn'); b.textContent = '✅ Copied!';
-                setTimeout(() => b.textContent = '📋 Copy Data Row', 2000);
-            });
-        }
-
-        function exportToExcel() {
-            const ws = XLSX.utils.json_to_sheet(filteredData);
-            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "TTT_DHL");
-            XLSX.writeFile(wb, `TTT_DHL_${new Date().toISOString().split('T')[0]}.xlsx`);
-        }
-
-        window.onload = loadData;
+        loadData();
     </script>
 </body>
 </html>
