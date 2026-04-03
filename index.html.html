@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTT DHL AI Smart Logistics v30.0 (Modern Edition)</title>
+    <title>TTT DHL AI Smart Logistics v30.9.2 (Ultra Sync)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -22,7 +21,7 @@
                 <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-bold text-2xl shadow-lg">T</div>
                 <div>
                     <h1 class="text-xl font-extrabold text-slate-800">TTT DHL Smart Logistics</h1>
-                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">v30.9 External Sync</p>
+                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">v30.9.2 Ultra Sync</p>
                 </div>
             </div>
             
@@ -31,7 +30,7 @@
                 <button onclick="switchTab('extractor')" id="tab-extractor" class="px-8 py-2.5 rounded-xl text-sm font-extrabold transition-all text-slate-500 hover:text-slate-800">AI Extractor</button>
             </div>
 
-            <div id="last-update" class="px-4 py-2 bg-slate-50 text-slate-500 rounded-xl text-xs font-bold border border-slate-100">Syncing...</div>
+            <div id="last-update" onclick="loadData()" class="px-4 py-2 bg-slate-50 text-slate-500 rounded-xl text-xs font-bold border border-slate-100 cursor-pointer hover:bg-slate-100 transition-all">Syncing...</div>
         </div>
 
         <!-- Dashboard Content -->
@@ -72,20 +71,20 @@
             <div class="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
                 <div class="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/30">
                     <h4 class="text-lg font-extrabold text-slate-800">Shipment Logs</h4>
-                    <input type="text" id="tableSearch" placeholder="Search..." class="px-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64">
+                    <input type="text" id="tableSearch" placeholder="Search..." onkeyup="filterTable()" class="px-4 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64">
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-50 text-slate-400 font-bold uppercase text-[10px] tracking-widest">
                             <tr>
-                                <th class="px-8 py-4">Waybill</th>
-                                <th class="px-8 py-4">Date</th>
-                                <th class="px-8 py-4">Year</th>
-                                <th class="px-8 py-4">Brand</th>
-                                <th class="px-8 py-4">Ship To</th>
-                                <th class="px-8 py-4 text-right">Weight</th>
-                                <th class="px-8 py-4 text-right">Charge</th>
-                                <th class="px-8 py-4">Remarks</th>
+                                <th class="px-8 py-4 font-bold">Waybill</th>
+                                <th class="px-8 py-4 font-bold">Date</th>
+                                <th class="px-8 py-4 font-bold">Year</th>
+                                <th class="px-8 py-4 font-bold">Brand</th>
+                                <th class="px-8 py-4 font-bold">Ship To</th>
+                                <th class="px-8 py-4 text-right font-bold">Weight</th>
+                                <th class="px-8 py-4 text-right font-bold">Charge</th>
+                                <th class="px-8 py-4 font-bold">Remarks</th>
                             </tr>
                         </thead>
                         <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
@@ -136,19 +135,39 @@
             try {
                 const status = document.getElementById('last-update');
                 status.innerText = "🔄 Syncing...";
-                const proxyUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(SHEET_CSV_URL + "&cb=" + Date.now());
-                const res = await fetch(proxyUrl);
-                const json = await res.json();
-                const csv = json.contents;
+                
+                // ใช้ Proxy ตัวสำรองที่เสถียรกว่า (Cloudflare Worker Proxy)
+                const finalUrl = "https://corsproxy.io/?" + encodeURIComponent(SHEET_CSV_URL + "&cb=" + Date.now());
+                const res = await fetch(finalUrl);
+                if (!res.ok) throw new Error("Connection failed");
+                const csv = await res.text();
 
-                const rows = csv.split(/\r?\n/).filter(r => r.trim()).map(r => r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.replace(/^"|"$/g, '').trim()));
+                const rows = parseCSV(csv);
+                if (rows.length <= 1) throw new Error("No data found");
+                
                 renderDashboard(rows.slice(1));
                 status.innerText = "✅ Sync: " + new Date().toLocaleTimeString();
                 status.className = "px-4 py-2 bg-green-50 text-green-600 rounded-xl text-xs font-bold border border-green-100";
             } catch (err) {
                 console.error(err);
-                document.getElementById('last-update').innerText = "❌ Sync Failed";
+                document.getElementById('last-update').innerText = "❌ Sync Failed: Retry";
+                document.getElementById('last-update').className = "px-4 py-2 bg-red-50 text-red-600 rounded-xl text-xs font-bold border border-red-100 cursor-pointer";
             }
+        }
+
+        function parseCSV(text) {
+            const p = text.split(/\r?\n/);
+            return p.filter(r => r.trim()).map(r => {
+                const cols = [];
+                let curr = '', inQuotes = false;
+                for (let char of r) {
+                    if (char === '"') inQuotes = !inQuotes;
+                    else if (char === ',' && !inQuotes) { cols.push(curr.trim()); curr = ''; }
+                    else curr += char;
+                }
+                cols.push(curr.trim());
+                return cols;
+            });
         }
 
         function renderDashboard(data) {
@@ -157,9 +176,10 @@
             let weight = 0, charge = 0, brands = {}, trend = {};
 
             data.forEach(row => {
+                if(row.length < 5) return;
                 const [wb, date, year, brand, shipTo, wStr, cStr] = row;
-                const w = parseFloat(wStr) || 0;
-                const c = parseFloat(cStr) || 0;
+                const w = parseFloat(wStr.replace(/,/g,'')) || 0;
+                const c = parseFloat(cStr.replace(/,/g,'')) || 0;
                 const rem = row[9] || "";
 
                 tbody.innerHTML += `
@@ -186,6 +206,14 @@
             initCharts(trend, brands);
         }
 
+        function filterTable() {
+            const input = document.getElementById("tableSearch").value.toUpperCase();
+            const rows = document.getElementById("table-body").getElementsByTagName("tr");
+            for (let row of rows) {
+                row.style.display = row.innerText.toUpperCase().includes(input) ? "" : "none";
+            }
+        }
+
         function initCharts(trend, brands) {
             const c1 = document.getElementById('trendChart').getContext('2d');
             const c2 = document.getElementById('brandChart').getContext('2d');
@@ -208,35 +236,37 @@
             document.getElementById('loader').classList.remove('hidden');
             const reader = new FileReader();
             reader.onload = async function() {
-                const pdf = await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
-                let text = "";
-                for(let i=1; i<=pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const content = await page.getTextContent();
-                    text += content.items.map(it => it.str).join(" ") + "\n";
-                }
-                const lines = text.split('\n').filter(l => l.trim());
-                const waybill = (text.match(/\b(\d{10})\b/) || ["","-"])[1];
-                const weight = (text.match(/([\d\.]+)\s*kg/i) || ["","-"])[1];
-                let charge = "-";
-                const cIdx = lines.findIndex(l => l.toUpperCase().includes("CHARGE BREAKDOWN"));
-                if(cIdx !== -1) { for(let i=cIdx+1; i<cIdx+10; i++) { const m = lines[i].match(/([\d,]+\.\d{2})/); if(m) { charge = m[1].replace(/,/g,''); break; } } }
-                let sDate = "-", year = "-";
-                const dM = text.match(/(\d{4})-(\d{2})-(\d{2})/);
-                if(dM) { const ms = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; sDate = `${parseInt(dM[3])}-${ms[parseInt(dM[2])-1]}-${dM[1]}`; year = dM[1]; }
-                let shipTo = "-";
-                const stIdx = lines.findIndex(l => l.toUpperCase().includes("SHIPMENT TO"));
-                if(stIdx !== -1) { const bl = ["THONG THAI","TEXTILE","CHUTIPHON","MONTRISETSIRI"]; for(let i=stIdx+1; i<stIdx+10; i++) { if(!bl.some(b => lines[i].toUpperCase().includes(b)) && lines[i].length > 3) { shipTo = lines[i]; break; } } }
-                
-                document.getElementById('loader').classList.add('hidden');
-                document.getElementById('extractorResult').classList.remove('hidden');
-                const grid = document.getElementById('previewGrid');
-                const fields = [["Waybill", waybill], ["Date", sDate], ["Year", year], ["Ship To", shipTo], ["Weight", weight+" kg"], ["Charge", "฿"+parseFloat(charge).toLocaleString()]];
-                grid.innerHTML = fields.map(f => `<div class="p-4 bg-slate-50 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">${f[0]}</p><p class="text-slate-800 font-extrabold text-lg">${f[1]}</p></div>`).join('');
-                document.getElementById('copyBtn').onclick = () => {
-                    navigator.clipboard.writeText(`${waybill}\t${sDate}\t${year}\t-\t${shipTo}\t${weight}\t${charge}\t-\t-\tComplete`);
-                    alert("Copied!");
-                };
+                try {
+                    const pdf = await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
+                    let text = "";
+                    for(let i=1; i<=pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const content = await page.getTextContent();
+                        text += content.items.map(it => it.str).join(" ") + "\n";
+                    }
+                    const lines = text.split('\n').filter(l => l.trim());
+                    const waybill = (text.match(/\b(\d{10})\b/) || ["","-"])[1];
+                    const weight = (text.match(/([\d\.]+)\s*kg/i) || ["","-"])[1];
+                    let charge = "0";
+                    const cIdx = lines.findIndex(l => l.toUpperCase().includes("CHARGE BREAKDOWN"));
+                    if(cIdx !== -1) { for(let i=cIdx+1; i<cIdx+10; i++) { const m = lines[i].match(/([\d,]+\.\d{2})/); if(m) { charge = m[1].replace(/,/g,''); break; } } }
+                    let sDate = "-", year = "-";
+                    const dM = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+                    if(dM) { const ms = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; sDate = `${parseInt(dM[3])}-${ms[parseInt(dM[2])-1]}-${dM[1]}`; year = dM[1]; }
+                    let shipTo = "-";
+                    const stIdx = lines.findIndex(l => l.toUpperCase().includes("SHIPMENT TO"));
+                    if(stIdx !== -1) { const bl = ["THONG THAI","TEXTILE","CHUTIPHON","MONTRISETSIRI"]; for(let i=stIdx+1; i<stIdx+10; i++) { if(!bl.some(b => lines[i].toUpperCase().includes(b)) && lines[i].length > 3) { shipTo = lines[i]; break; } } }
+                    
+                    document.getElementById('loader').classList.add('hidden');
+                    document.getElementById('extractorResult').classList.remove('hidden');
+                    const grid = document.getElementById('previewGrid');
+                    const fields = [["Waybill", waybill], ["Date", sDate], ["Year", year], ["Ship To", shipTo], ["Weight", weight+" kg"], ["Charge", "฿"+parseFloat(charge).toLocaleString()]];
+                    grid.innerHTML = fields.map(f => `<div class="p-4 bg-slate-50 rounded-2xl border border-slate-100"><p class="text-[10px] font-bold text-slate-400 uppercase mb-1">${f[0]}</p><p class="text-slate-800 font-extrabold text-lg">${f[1]}</p></div>`).join('');
+                    document.getElementById('copyBtn').onclick = () => {
+                        navigator.clipboard.writeText(`${waybill}\t${sDate}\t${year}\t-\t${shipTo}\t${weight}\t${charge}\t-\t-\tComplete`);
+                        alert("Copied!");
+                    };
+                } catch (err) { alert("PDF Error: " + err.message); document.getElementById('loader').classList.add('hidden'); }
             };
             reader.readAsArrayBuffer(file);
         });
