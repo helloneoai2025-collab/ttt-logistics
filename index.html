@@ -3,21 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTT DHL Logistics v31.8 (Dynamic Edition)</title>
+    <title>TTT DHL Logistics v31.9 (Excel Export Ready)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- เพิ่ม Library สำหรับสร้างไฟล์ Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700;800&display=swap');
-        body { font-family: 'Sarabun', sans-serif; background-color: #f4f7f6; scroll-behavior: smooth; }
-        .stat-card { border-radius: 20px; background: #fff; border: 1px solid #e2e8f0; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); height: 140px; display: flex; flex-direction: column; justify-content: center; }
+        body { font-family: 'Sarabun', sans-serif; background-color: #f4f7f6; }
+        .stat-card { border-radius: 20px; background: #fff; border: 1px solid #e2e8f0; transition: all 0.4s; height: 140px; display: flex; flex-direction: column; justify-content: center; }
         .stat-card:hover { transform: translateY(-8px); box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
         .tab-btn { border-radius: 12px; padding: 10px 35px; font-weight: 800; transition: 0.3s; }
         .tab-active { background-color: #d91d1d; color: white; box-shadow: 0 4px 12px rgba(217, 29, 29, 0.3); }
         .tab-inactive { background-color: #fff; color: #64748b; border: 1px solid #e2e8f0; }
         .table-header-yellow { background-color: #ffce45; color: #000; font-weight: 800; }
-        .export-btn { background-color: #009664; color: white; font-weight: 800; border-radius: 12px 12px 0 0; }
-        canvas { transition: all 0.5s ease; }
+        .export-btn { background-color: #009664; color: white; font-weight: 800; border-radius: 12px 12px 0 0; transition: 0.3s; cursor: pointer; }
+        .export-btn:hover { background-color: #007a51; }
     </style>
 </head>
 <body class="p-4 md:p-10">
@@ -26,10 +28,10 @@
         <!-- Header -->
         <div class="flex flex-col lg:flex-row justify-between items-center mb-10 gap-8">
             <div class="flex items-center gap-5">
-                <div class="bg-[#d91d1d] text-white p-4 rounded-2xl font-black text-4xl shadow-xl animate-pulse">TTT</div>
+                <div class="bg-[#d91d1d] text-white p-4 rounded-2xl font-black text-4xl shadow-xl">TTT</div>
                 <div>
                     <h1 class="text-4xl font-extrabold text-[#1e293b]">DHL Logistics</h1>
-                    <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">Dynamic Analytics Dashboard</p>
+                    <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">v31.9 Analytics & Excel Export</p>
                 </div>
             </div>
 
@@ -38,50 +40,50 @@
                 <button onclick="switchTab('extractor')" id="btn-extractor" class="tab-btn tab-inactive ml-2">AI Extractor</button>
             </div>
 
-            <button onclick="loadData()" id="last-update" class="bg-[#ffce45] hover:bg-[#f3bc2c] text-black px-8 py-3.5 rounded-2xl font-black shadow-lg shadow-yellow-200 transition-all flex items-center gap-3 active:scale-95">
-                <span id="sync-icon">🔄</span> ซิงค์ข้อมูลล่าสุด
+            <button onclick="loadData()" id="last-update" class="bg-[#ffce45] hover:bg-[#f3bc2c] text-black px-8 py-3.5 rounded-2xl font-black shadow-lg shadow-yellow-200 transition-all flex items-center gap-3">
+                🔄 ซิงค์ข้อมูลล่าสุด
             </button>
         </div>
 
-        <!-- Dashboard Tab -->
+        <!-- Dashboard Content -->
         <div id="content-dashboard" class="space-y-8 animate-in fade-in duration-700">
-            <!-- Stats (Will update dynamically) -->
+            <!-- Stats -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div class="stat-card p-8 border-l-[10px] border-l-slate-200">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">FILTERED SHIPMENTS</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">FILTERED SHIPMENTS</p>
                     <h3 id="stat-count" class="text-5xl font-black text-slate-800 tracking-tighter">0</h3>
                 </div>
                 <div class="stat-card p-8 border-l-[10px] border-l-[#ffce45]">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">WEIGHT (KG)</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">WEIGHT (KG)</p>
                     <h3 id="stat-weight" class="text-5xl font-black text-slate-800 tracking-tighter">0</h3>
                 </div>
                 <div class="stat-card p-8 border-l-[10px] border-l-[#d91d1d]">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">TOTAL COST (THB)</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">TOTAL COST (THB)</p>
                     <h3 id="stat-charge" class="text-4xl font-black text-slate-800 tracking-tighter">0</h3>
                 </div>
                 <div class="stat-card p-8 border-l-[10px] border-l-blue-600">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">TOP BRAND (VIEW)</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">TOP BRAND</p>
                     <h3 id="stat-brand" class="text-2xl font-black text-blue-700 truncate">-</h3>
                 </div>
             </div>
 
-            <!-- Charts (Will update dynamically) -->
+            <!-- Charts -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
-                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 h-[450px]">
                     <h4 class="font-black text-slate-700 mb-8 flex items-center gap-3 text-lg underline decoration-[#ffce45] decoration-4 underline-offset-8">Cost Analysis by Brand</h4>
-                    <div class="h-[350px]"><canvas id="brandChart"></canvas></div>
+                    <div class="h-80"><canvas id="brandChart"></canvas></div>
                 </div>
-                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 h-[450px]">
                     <h4 class="font-black text-slate-700 mb-8 flex items-center gap-3 text-lg underline decoration-[#d91d1d] decoration-4 underline-offset-8">Monthly Shipment Trend</h4>
-                    <div class="h-[350px]"><canvas id="trendChart"></canvas></div>
+                    <div class="h-80"><canvas id="trendChart"></canvas></div>
                 </div>
             </div>
 
             <!-- Interactive Filters -->
             <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap gap-6 items-center sticky top-4 z-10 shadow-xl shadow-slate-200/50">
                 <div class="relative flex-1 min-w-[350px]">
-                    <span class="absolute left-5 top-4 text-xl">🔍</span>
-                    <input type="text" id="tableSearch" onkeyup="updateDynamicView()" placeholder="ค้นหา Waybill, Ship To, หรือข้อมูลอื่นๆ..." class="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] outline-none focus:ring-4 focus:ring-blue-100 font-bold text-slate-600 transition-all">
+                    <span class="absolute left-5 top-4 text-xl text-slate-300">🔍</span>
+                    <input type="text" id="tableSearch" onkeyup="updateDynamicView()" placeholder="ค้นหาข้อมูลในตาราง..." class="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] outline-none focus:ring-4 focus:ring-blue-100 font-bold text-slate-600 transition-all">
                 </div>
                 <select id="filterBrand" onchange="updateDynamicView()" class="bg-slate-50 border border-slate-200 px-6 py-4 rounded-[1.25rem] font-black text-slate-600 outline-none hover:bg-slate-100 transition-all cursor-pointer">
                     <option value="">ทุกแบรนด์</option>
@@ -91,13 +93,13 @@
                 </select>
             </div>
 
-            <!-- Table -->
+            <!-- Table & Export -->
             <div class="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden">
-                <div class="export-btn w-full py-4 flex items-center justify-center font-black text-lg gap-3">
-                    <span>📊</span> Logistics Detailed Shipment Logs
+                <div onclick="exportToExcel()" class="export-btn w-full py-4 flex items-center justify-center font-black text-lg gap-3">
+                    <span>📗</span> Export Data to Excel (.xlsx)
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left" id="shipmentTable">
+                    <table class="w-full text-left">
                         <thead class="table-header-yellow uppercase text-[11px] tracking-widest">
                             <tr>
                                 <th class="px-8 py-6">Brand</th>
@@ -125,8 +127,8 @@
                 <h3 class="text-3xl font-black text-slate-800">คลิกเพื่ออัปโหลดไฟล์ PDF</h3>
                 <input type="file" id="pdfUpload" accept=".pdf" class="hidden">
             </div>
-            <div id="extractorResult" class="hidden mt-10 bg-white p-12 rounded-[3rem] border shadow-2xl relative">
-                <div id="loader" class="hidden absolute inset-0 bg-white/95 flex items-center justify-center rounded-[3rem] z-20"><p class="font-black text-[#d91d1d] text-2xl animate-bounce tracking-tighter">AI ANALYSIS IN PROGRESS...</p></div>
+            <div id="extractorResult" class="hidden mt-10 bg-white p-10 rounded-[3rem] border shadow-2xl relative">
+                <div id="loader" class="hidden absolute inset-0 bg-white/95 flex items-center justify-center rounded-[3rem] z-20"><p class="font-black text-[#d91d1d] text-2xl animate-bounce">AI ANALYSIS IN PROGRESS...</p></div>
                 <div class="flex justify-between items-center mb-8 border-b pb-6"><h3 class="text-2xl font-black">ผลการแกะข้อมูล</h3><button id="copyBtn" class="bg-blue-600 text-white px-10 py-3 rounded-xl font-black shadow-lg active:scale-95 transition-all">Copy Row</button></div>
                 <div id="previewGrid" class="grid grid-cols-2 gap-6"></div>
             </div>
@@ -136,8 +138,10 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
         const API_URL = "https://script.google.com/macros/s/AKfycbz96PFGxEPGbkVcW5YBkalo5RV6eTiMuIG0N_9PQ8eNCSKyZV5ShE5AwJmk8ITt-5QnPA/exec";
+        
         let trendChart, brandChart;
-        let masterData = [];
+        let masterData = []; // เก็บข้อมูลหลักทั้งหมด
+        let currentFilteredData = []; // เก็บข้อมูลที่ถูกกรองอยู่ ณ ปัจจุบัน
 
         function switchTab(tab) {
             document.getElementById('content-dashboard').classList.toggle('hidden', tab !== 'dashboard');
@@ -152,10 +156,10 @@
                 btn.innerHTML = `<span class="animate-spin inline-block">🔄</span> กำลังซิงค์...`;
                 const response = await fetch(API_URL);
                 const rawData = await response.json();
-                masterData = rawData.slice(1); // เก็บข้อมูลทั้งหมดไว้ในตัวแปรหลัก
+                masterData = rawData.slice(1);
                 
                 populateFilters(masterData);
-                updateDynamicView(); // ประมวลผลครั้งแรก
+                updateDynamicView();
                 
                 btn.innerHTML = `✅ ซิงค์สำเร็จ: ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
             } catch (err) { console.error(err); document.getElementById('last-update').innerText = "❌ การซิงค์ล้มเหลว"; }
@@ -177,8 +181,7 @@
             const brandFilter = document.getElementById("filterBrand").value;
             const yearFilter = document.getElementById("filterYear").value;
 
-            // กรองข้อมูลตามที่เลือก
-            const filteredData = masterData.filter(row => {
+            currentFilteredData = masterData.filter(row => {
                 const rowText = row.join(' ').toUpperCase();
                 const matchSearch = rowText.includes(search);
                 const matchBrand = !brandFilter || row[1] === brandFilter;
@@ -186,7 +189,7 @@
                 return matchSearch && matchBrand && matchYear;
             });
 
-            renderDashboardUI(filteredData);
+            renderDashboardUI(currentFilteredData);
         }
 
         function renderDashboardUI(data) {
@@ -222,7 +225,6 @@
                 const month = sDate.split('-')[1] || 'Other'; trendMap[month] = (trendMap[month] || 0) + 1;
             });
 
-            // Update Stats with Animation
             document.getElementById('stat-count').innerText = data.length;
             document.getElementById('stat-weight').innerText = weight.toFixed(1).toLocaleString();
             document.getElementById('stat-charge').innerText = charge.toLocaleString(undefined, {minimumFractionDigits:0});
@@ -248,6 +250,32 @@
             });
         }
 
+        // --- EXCEL EXPORT LOGIC ---
+        function exportToExcel() {
+            if (currentFilteredData.length === 0) { alert("ไม่มีข้อมูลสำหรับการ Export"); return; }
+
+            // เตรียมข้อมูลสำหรับ Excel
+            const excelData = currentFilteredData.map(row => ({
+                "Brand": row[1],
+                "Waybill No.": row[2],
+                "Shipment Date": row[3],
+                "Year": row[4],
+                "Ship To": row[5],
+                "Weight (KG)": parseFloat(String(row[6]).replace(/,/g,'')) || 0,
+                "Total Charge (THB)": parseFloat(String(row[7]).replace(/,/g,'')) || 0,
+                "Remarks": row[9] || ""
+            }));
+
+            // สร้าง Workbook
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Logistics Data");
+
+            // ดาวน์โหลดไฟล์
+            const fileName = `TTT_DHL_Export_${new Date().toLocaleDateString()}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+        }
+
         document.getElementById('pdfUpload').addEventListener('change', async (e) => {
             const file = e.target.files[0]; if(!file) return;
             document.getElementById('loader').classList.remove('hidden');
@@ -266,8 +294,8 @@
                     if(stIdx !== -1) { const bl = ["THONG THAI","TEXTILE","CHUTIPHON","MONTRISETSIRI"]; for(let i=stIdx+1; i<stIdx+10; i++) { if(!bl.some(b => lines[i].toUpperCase().includes(b)) && lines[i].length > 3) { shipTo = lines[i]; break; } } }
                     document.getElementById('loader').classList.add('hidden'); document.getElementById('extractorResult').classList.remove('hidden');
                     const grid = document.getElementById('previewGrid'), fields = [["Waybill", waybill], ["Date", sDate], ["Year", year], ["Ship To", shipTo], ["Weight", weight+" kg"], ["Charge", "฿"+parseFloat(charge).toLocaleString()]];
-                    grid.innerHTML = fields.map(f => `<div class="p-8 bg-slate-50 rounded-[2rem] border border-slate-200 shadow-sm"><p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">${f[0]}</p><p class="text-slate-900 font-black text-2xl tracking-tight">${f[1]}</p></div>`).join('');
-                    document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(`\t-\t${waybill}\t${sDate}\t${year}\t${shipTo}\t${weight}\t${charge}\t-\tComplete`); alert("🚀 ข้อมูลถูกคัดลอกลง Clipboard เรียบร้อย!"); };
+                    grid.innerHTML = fields.map(f => `<div class="p-8 bg-slate-50 rounded-[2rem] border border-slate-200 transition-all hover:bg-white hover:shadow-xl"><p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">${f[0]}</p><p class="text-slate-900 font-black text-2xl tracking-tight">${f[1]}</p></div>`).join('');
+                    document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(`\t-\t${waybill}\t${sDate}\t${year}\t${shipTo}\t${weight}\t${charge}\t-\tComplete`); alert("🚀 คัดลอกสำเร็จ!"); };
                 } catch (err) { alert(err.message); document.getElementById('loader').classList.add('hidden'); }
             }; reader.readAsArrayBuffer(file);
         });
