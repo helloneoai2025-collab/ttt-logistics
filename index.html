@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTT DHL Logistics v31.11 (Secure Admin Link)</title>
+    <title>TTT DHL Logistics v31.12 (Secure & Dynamic)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -17,8 +17,8 @@
         .tab-active { background-color: #d91d1d; color: white; box-shadow: 0 4px 12px rgba(217, 29, 29, 0.3); }
         .tab-inactive { background-color: #fff; color: #64748b; border: 1px solid #e2e8f0; }
         .table-header-yellow { background-color: #ffce45; color: #000; font-weight: 800; }
-        .export-btn { background-color: #009664; color: white; font-weight: 800; border-radius: 12px 0 0 0; transition: 0.3s; cursor: pointer; flex: 1; }
-        .admin-btn { background-color: #1e293b; color: white; font-weight: 800; border-radius: 0 12px 0 0; transition: 0.3s; cursor: pointer; flex: 1; border-left: 1px solid rgba(255,255,255,0.1); }
+        .export-btn { background-color: #009664; color: white; font-weight: 800; border-radius: 12px 0 0 0; transition: 0.3s; cursor: pointer; flex: 1; text-align: center; }
+        .admin-btn { background-color: #1e293b; color: white; font-weight: 800; border-radius: 0 12px 0 0; transition: 0.3s; cursor: pointer; flex: 1; text-align: center; border-left: 1px solid rgba(255,255,255,0.1); }
         .export-btn:hover { background-color: #007a51; }
         .admin-btn:hover { background-color: #000; }
     </style>
@@ -32,7 +32,7 @@
                 <div class="bg-[#d91d1d] text-white p-4 rounded-2xl font-black text-4xl shadow-xl">TTT</div>
                 <div>
                     <h1 class="text-4xl font-extrabold text-[#1e293b]">DHL Logistics</h1>
-                    <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">Secure Intelligent Dashboard</p>
+                    <p class="text-slate-400 font-bold text-sm uppercase tracking-widest text-xs">v31.12 Intelligent Dashboard (Secure Edition)</p>
                 </div>
             </div>
 
@@ -41,37 +41,232 @@
                 <button onclick="switchTab('extractor')" id="btn-extractor" class="tab-btn tab-inactive ml-2">AI Extractor</button>
             </div>
 
-            <button onclick="loadData()" id="last-update" class="bg-[#ffce45] hover:bg-[#f3bc2c] text-black px-8 py-3.5 rounded-2xl font-black shadow-lg shadow-yellow-200 transition-all flex items-center gap-3">
+            <button onclick="loadData()" id="last-update" class="bg-[#ffce45] hover:bg-[#f3bc2c] text-black px-8 py-3.5 rounded-2xl font-black shadow-lg shadow-yellow-200 transition-all flex items-center gap-3 active:scale-95">
                 🔄 ซิงค์ข้อมูลล่าสุด
             </button>
         </div>
 
         <!-- Dashboard Content -->
         <div id="content-dashboard" class="space-y-8 animate-in fade-in duration-700">
-            <!-- Stats -->
+            <!-- Stats Grid -->
             <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div class="stat-card p-8 border-l-[10px] border-l-slate-200">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">TOTAL SHIPMENTS</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">TOTAL VIEWING</p>
                     <h3 id="stat-count" class="text-5xl font-black text-slate-800 tracking-tighter">0</h3>
                 </div>
                 <div class="stat-card p-8 border-l-[10px] border-l-[#ffce45]">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">WEIGHT (KG)</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">WEIGHT (KG)</p>
                     <h3 id="stat-weight" class="text-5xl font-black text-slate-800 tracking-tighter">0</h3>
                 </div>
                 <div class="stat-card p-8 border-l-[10px] border-l-[#d91d1d]">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">TOTAL COST (THB)</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">COST (THB)</p>
                     <h3 id="stat-charge" class="text-4xl font-black text-slate-800 tracking-tighter">0</h3>
                 </div>
                 <div class="stat-card p-8 border-l-[10px] border-l-blue-600">
-                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2">TOP BRAND</p>
+                    <p class="text-slate-400 text-[11px] font-black uppercase mb-2 tracking-widest">TOP BRAND (VIEW)</p>
                     <h3 id="stat-brand" class="text-2xl font-black text-blue-700 truncate">-</h3>
                 </div>
             </div>
 
-            <!-- Charts -->
+            <!-- Charts Section -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 h-[450px]">
                     <h4 class="font-black text-slate-700 mb-8 flex items-center gap-3 text-lg underline decoration-[#ffce45] decoration-4">Cost Analysis by Brand</h4>
-                    <div class="h-80">
-```html
-<canvas id="brandChart"></canvas>
+                    <div class="h-80"><canvas id="brandChart"></canvas></div>
+                </div>
+                <div class="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 h-[450px]">
+                    <h4 class="font-black text-slate-700 mb-8 flex items-center gap-3 text-lg underline decoration-[#d91d1d] decoration-4">Monthly Shipment Trend</h4>
+                    <div class="h-80"><canvas id="trendChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Filters Section -->
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-100 flex flex-wrap gap-6 items-center sticky top-4 z-10 shadow-xl shadow-slate-200/20">
+                <div class="relative flex-1 min-w-[350px]">
+                    <span class="absolute left-5 top-4 text-xl text-slate-300">🔍</span>
+                    <input type="text" id="tableSearch" onkeyup="updateDynamicView()" placeholder="ค้นหาข้อมูล..." class="w-full pl-14 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-[1.25rem] outline-none focus:ring-4 focus:ring-blue-100 font-bold text-slate-600 transition-all">
+                </div>
+                <select id="filterBrand" onchange="updateDynamicView()" class="bg-slate-50 border border-slate-200 px-6 py-4 rounded-[1.25rem] font-black text-slate-600 outline-none hover:bg-slate-100 cursor-pointer">
+                    <option value="">ทุกแบรนด์</option>
+                </select>
+                <select id="filterYear" onchange="updateDynamicView()" class="bg-slate-50 border border-slate-200 px-6 py-4 rounded-[1.25rem] font-black text-slate-600 outline-none hover:bg-slate-100 cursor-pointer">
+                    <option value="">ทุกปี</option>
+                </select>
+            </div>
+
+            <!-- Table & Action Buttons -->
+            <div class="bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden">
+                <div class="flex w-full">
+                    <div onclick="exportToExcel()" class="export-btn py-4 flex items-center justify-center gap-3 text-lg">
+                        <span>📗</span> Export Data to Excel
+                    </div>
+                    <div onclick="openGoogleSheet()" class="admin-btn py-4 flex items-center justify-center gap-3 text-lg">
+                        <span>📝</span> Update Data (Admin Only)
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="table-header-yellow uppercase text-[11px] tracking-widest font-black">
+                            <tr>
+                                <th class="px-8 py-6">Brand</th>
+                                <th class="px-8 py-6">Waybill No.</th>
+                                <th class="px-8 py-6">Date</th>
+                                <th class="px-8 py-6 text-center font-black">Year</th>
+                                <th class="px-8 py-6">Ship To</th>
+                                <th class="px-8 py-6 text-right font-black">Weight</th>
+                                <th class="px-8 py-6 text-right font-black">Charge</th>
+                                <th class="px-8 py-6 font-black">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body" class="divide-y divide-slate-100 text-[13px] font-bold text-slate-600 italic"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Extractor Tab -->
+        <div id="content-extractor" class="hidden max-w-4xl mx-auto py-10 animate-in slide-in-from-bottom-8 duration-700">
+            <div class="bg-white p-20 rounded-[4rem] border-4 border-dashed border-slate-200 text-center cursor-pointer group hover:border-blue-500 transition-all" onclick="document.getElementById('pdfUpload').click()">
+                <div class="w-24 h-24 bg-slate-100 text-slate-400 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-all group-hover:bg-blue-50">
+                    <svg class="w-12 h-12 group-hover:text-blue-500 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h3 class="text-3xl font-black text-slate-800">คลิกเพื่ออัปโหลดไฟล์ PDF</h3>
+                <input type="file" id="pdfUpload" accept=".pdf" class="hidden">
+            </div>
+            <div id="extractorResult" class="hidden mt-10 bg-white p-10 rounded-[3rem] border shadow-2xl relative">
+                <div id="loader" class="hidden absolute inset-0 bg-white/95 flex items-center justify-center rounded-[3rem] z-20"><p class="font-black text-[#d91d1d] text-2xl animate-bounce">AI ANALYZING...</p></div>
+                <div class="flex justify-between items-center mb-8 border-b pb-6"><h3 class="text-2xl font-black">ผลการแกะข้อมูล</h3><button id="copyBtn" class="bg-blue-600 text-white px-10 py-3 rounded-xl font-black active:scale-95 transition-all">Copy Row</button></div>
+                <div id="previewGrid" class="grid grid-cols-2 gap-6"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+        const API_URL = "https://script.google.com/macros/s/AKfycbz96PFGxEPGbkVcW5YBkalo5RV6eTiMuIG0N_9PQ8eNCSKyZV5ShE5AwJmk8ITt-5QnPA/exec";
+        const SHEET_LINK = "https://docs.google.com/spreadsheets/d/1_SmIsOfAtIr_Of9SmIsOfAtIr_Of9SmIsOfAtIr_Of9S/edit"; // แก้ไขลิงก์ Google Sheets ของคุณที่นี่
+
+        let trendChart, brandChart;
+        let masterData = []; 
+        let currentFilteredData = [];
+
+        function switchTab(tab) {
+            document.getElementById('content-dashboard').classList.toggle('hidden', tab !== 'dashboard');
+            document.getElementById('content-extractor').classList.toggle('hidden', tab !== 'extractor');
+            document.getElementById('btn-dashboard').className = `tab-btn ${tab === 'dashboard' ? 'tab-active' : 'tab-inactive'}`;
+            document.getElementById('btn-extractor').className = `tab-btn ${tab === 'extractor' ? 'tab-active' : 'tab-inactive'} ml-2`;
+        }
+
+        async function loadData() {
+            try {
+                const btn = document.getElementById('last-update');
+                btn.innerHTML = `<span class="animate-spin inline-block">🔄</span> Syncing...`;
+                const response = await fetch(API_URL);
+                const rawData = await response.json();
+                masterData = rawData.slice(1);
+                populateFilters(masterData);
+                updateDynamicView();
+                btn.innerHTML = `✅ ซิงค์สำเร็จ: ${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}`;
+            } catch (err) { console.error(err); document.getElementById('last-update').innerText = "❌ Connection Failed"; }
+        }
+
+        function populateFilters(data) {
+            const brands = new Set(), years = new Set();
+            data.forEach(row => { if(row[1]) brands.add(row[1]); if(row[4]) years.add(row[4]); });
+            document.getElementById('filterBrand').innerHTML = '<option value="">ทุกแบรนด์</option>' + Array.from(brands).sort().map(b => `<option value="${b}">${b}</option>`).join('');
+            document.getElementById('filterYear').innerHTML = '<option value="">ทุกปี</option>' + Array.from(years).sort().map(y => `<option value="${y}">${y}</option>`).join('');
+        }
+
+        function updateDynamicView() {
+            const search = document.getElementById("tableSearch").value.toUpperCase();
+            const brandFilter = document.getElementById("filterBrand").value;
+            const yearFilter = document.getElementById("filterYear").value;
+            currentFilteredData = masterData.filter(row => {
+                const rowText = row.join(' ').toUpperCase();
+                const matchSearch = rowText.includes(search);
+                const matchBrand = !brandFilter || row[1] === brandFilter;
+                const matchYear = !yearFilter || String(row[4]) === yearFilter;
+                return matchSearch && matchBrand && matchYear;
+            });
+            renderDashboardUI(currentFilteredData);
+        }
+
+        function renderDashboardUI(data) {
+            const tbody = document.getElementById('table-body'); tbody.innerHTML = '';
+            let weight = 0, charge = 0, brandsMap = {}, trendMap = {};
+            data.forEach(row => {
+                const brand = String(row[1] || "-").trim();
+                const waybill = String(row[2] || "-").trim();
+                const sDate = String(row[3] || "-").trim();
+                const sYear = String(row[4] || "-").trim();
+                const shipTo = String(row[5] || "-").trim();
+                const wVal = parseFloat(String(row[6] || "0").replace(/,/g,'')) || 0;
+                const cVal = parseFloat(String(row[7] || "0").replace(/,/g,'')) || 0;
+                const remark = String(row[9] || "").trim();
+                if (waybill === "-" || waybill === "") return;
+                tbody.innerHTML += `<tr class="hover:bg-slate-50 border-b border-slate-50 transition-all"><td class="px-8 py-5 text-slate-900 font-black">${brand}</td><td class="px-8 py-5 font-black text-blue-600 underline">${waybill}</td><td class="px-8 py-5 text-slate-500 font-bold">${sDate}</td><td class="px-8 py-5 text-slate-400 font-black text-center text-xs">${sYear}</td><td class="px-8 py-5 truncate max-w-[280px] font-bold text-slate-700">${shipTo}</td><td class="px-8 py-5 text-right font-black text-slate-800">${wVal.toFixed(1)}</td><td class="px-8 py-5 text-right font-black text-[#d91d1d]">฿${cVal.toLocaleString(undefined, {minimumFractionDigits:2})}</td><td class="px-8 py-5 text-[11px] text-slate-400 font-bold uppercase">${remark}</td></tr>`;
+                weight += wVal; charge += cVal;
+                if(brand !== "-") brandsMap[brand] = (brandsMap[brand] || 0) + cVal;
+                const month = sDate.split('-')[1] || 'Other'; trendMap[month] = (trendMap[month] || 0) + 1;
+            });
+            document.getElementById('stat-count').innerText = data.length;
+            document.getElementById('stat-weight').innerText = weight.toFixed(1).toLocaleString();
+            document.getElementById('stat-charge').innerText = charge.toLocaleString(undefined, {minimumFractionDigits:0});
+            document.getElementById('stat-brand').innerText = Object.entries(brandsMap).sort((a,b) => b[1]-a[1])[0]?.[0] || "-";
+            updateCharts(trendMap, brandsMap);
+        }
+
+        function updateCharts(trend, brands) {
+            const ctx1 = document.getElementById('trendChart').getContext('2d'), ctx2 = document.getElementById('brandChart').getContext('2d');
+            if(trendChart) trendChart.destroy(); if(brandChart) brandChart.destroy();
+            const palette = ['#ffce45', '#d91d1d', '#1e293b', '#2563eb', '#009664', '#f59e0b', '#8b5cf6'];
+            trendChart = new Chart(ctx1, { type: 'bar', data: { labels: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'], datasets: [{ label: 'Shipments', data: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => trend[m]||0), backgroundColor: '#d91d1d', borderRadius: 8 }] }, options: { animation: { duration: 800 }, responsive: true, maintainAspectRatio: false } });
+            brandChart = new Chart(ctx2, { type: 'doughnut', data: { labels: Object.keys(brands), datasets: [{ data: Object.values(brands), backgroundColor: palette, borderWidth: 0 }] }, options: { animation: { animateRotate: true }, responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { font: { weight: 'bold', size: 11 } } } } } });
+        }
+
+        function exportToExcel() {
+            if (currentFilteredData.length === 0) { alert("ไม่มีข้อมูลสำหรับการ Export"); return; }
+            const excelData = currentFilteredData.map(row => ({ "Brand": row[1], "Waybill No.": row[2], "Shipment Date": row[3], "Year": row[4], "Ship To": row[5], "Weight (KG)": parseFloat(String(row[6]).replace(/,/g,'')) || 0, "Total Charge (THB)": parseFloat(String(row[7]).replace(/,/g,'')) || 0, "Remarks": row[9] || "" }));
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
+            XLSX.writeFile(workbook, `TTT_Export_${new Date().toLocaleDateString()}.xlsx`);
+        }
+
+        function openGoogleSheet() {
+            const pass = prompt("กรุณาใส่รหัสผ่านเพื่อเปิดฐานข้อมูล (Admin Only):");
+            if (pass === "Dev3399*") {
+                window.open("https://docs.google.com/spreadsheets/d/1SmIsOfAtIr_Of9SmIsOfAtIr_Of9SmIsOfAtIr_Of9S/edit", "_blank");
+            } else if (pass !== null) {
+                alert("รหัสผ่านไม่ถูกต้อง!");
+            }
+        }
+
+        document.getElementById('pdfUpload').addEventListener('change', async (e) => {
+            const file = e.target.files[0]; if(!file) return;
+            document.getElementById('loader').classList.remove('hidden');
+            const reader = new FileReader();
+            reader.onload = async function() {
+                try {
+                    const pdf = await pdfjsLib.getDocument(new Uint8Array(this.result)).promise;
+                    let text = ""; for(let i=1; i<=pdf.numPages; i++) { const page = await pdf.getPage(i); const content = await page.getTextContent(); text += content.items.map(it => it.str).join(" ") + "\n"; }
+                    const lines = text.split('\n').filter(l => l.trim());
+                    const waybill = (text.match(/\b(\d{10})\b/) || ["","-"])[1], weight = (text.match(/([\d\.]+)\s*kg/i) || ["","-"])[1];
+                    let charge = "0"; const cIdx = lines.findIndex(l => l.toUpperCase().includes("CHARGE BREAKDOWN"));
+                    if(cIdx !== -1) { for(let i=cIdx+1; i<cIdx+10; i++) { const m = lines[i].match(/([\d,]+\.\d{2})/); if(m) { charge = m[1].replace(/,/g,''); break; } } }
+                    let sDate = "-", year = "-"; const dM = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+                    if(dM) { const ms = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]; sDate = `${parseInt(dM[3])}-${ms[parseInt(dM[2])-1]}-${dM[1]}`; year = dM[1]; }
+                    let shipTo = "-"; const stIdx = lines.findIndex(l => l.toUpperCase().includes("SHIPMENT TO"));
+                    if(stIdx !== -1) { const bl = ["THONG THAI","TEXTILE","CHUTIPHON","MONTRISETSIRI"]; for(let i=stIdx+1; i<stIdx+10; i++) { if(!bl.some(b => lines[i].toUpperCase().includes(b)) && lines[i].length > 3) { shipTo = lines[i]; break; } } }
+                    document.getElementById('loader').classList.add('hidden'); document.getElementById('extractorResult').classList.remove('hidden');
+                    const grid = document.getElementById('previewGrid'), fields = [["Waybill", waybill], ["Date", sDate], ["Year", year], ["Ship To", shipTo], ["Weight", weight+" kg"], ["Charge", "฿"+parseFloat(charge).toLocaleString()]];
+                    grid.innerHTML = fields.map(f => `<div class="p-8 bg-slate-50 rounded-[2rem] border border-slate-200 shadow-sm"><p class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">${f[0]}</p><p class="text-slate-900 font-black text-2xl tracking-tight">${f[1]}</p></div>`).join('');
+                    document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(`\t-\t${waybill}\t${sDate}\t${year}\t${shipTo}\t${weight}\t${charge}\t-\tComplete`); alert("🚀 Data copied!"); };
+                } catch (err) { alert(err.message); document.getElementById('loader').classList.add('hidden'); }
+            }; reader.readAsArrayBuffer(file);
+        });
+
+        loadData();
+    </script>
+</body>
+</html>
